@@ -130,7 +130,7 @@ int main()
 			uint64_t ts = (granule * 1000 * 1000 * 1000) / SAMPLE_RATE;
 			mkv_segment.AddFrame(reinterpret_cast<const uint8_t *>(&frame[0]),
 			                     frame.size(), mkv_track_id, ts, true);
-			granule += FRAME_SIZE;
+			granule += FRAME_SAMPLES;
 		}
 	}
 	mkv_segment.Finalize();
