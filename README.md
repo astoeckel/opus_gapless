@@ -18,4 +18,4 @@ Then serve this directory via HTTP, e.g. by running
 ```sh
 python3 -m http.server
 ```
-and go to http://localhost/demo.html
+and go to http://localhost:8000/demo.html
