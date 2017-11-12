@@ -1,15 +1,21 @@
-# Gapless WebM stream from pre-encoded Opus frames
+# Gapless stream from pre-encoded Opus frames
+
+This program demos streaming independent chunks of Ogg/Opus audio and playing them back in the browser.
 
 To build:
 ```sh
-git clone https://github.com/astoeckel/opus_gapless_webm --recursive
-cd opus_gapless_webm
+git clone https://github.com/astoeckel/opus_gapless
+cd opus_gapless
 make
 ```
 
 To run:
 ```sh
-ffmpeg -loglevel error -i <AUDIO FILE> -ac 2 -ar 48000 -f s16le - | ./opus_gapless_webm
+mkdir -p blocks && rm blocks/* && ffmpeg -loglevel error -i <AUDIO FILE> -ac 2 -ar 48000 -f s16le - | ./opus_gapless
 ```
 
-The program produces a file `test.webm` which contains a transcoded version of the input file where the audio was divided into 1s blocks and then shuffled.
+Then serve this directory via HTTP, e.g. by running
+```sh
+python3 -m http.server
+```
+and go to http://localhost/demo.html

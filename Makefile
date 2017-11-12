@@ -1,12 +1,9 @@
-all: opus_gapless_webm
+all: opus_gapless
 
-opus_gapless_webm: opus_gapless_webm.cpp libwebm/mkvmuxer/*
-	c++ -o opus_gapless_webm -std=c++14 -Wall \
-		opus_gapless_webm.cpp \
-		libwebm/mkvmuxer/mkvmuxer.cc \
-		libwebm/mkvmuxer/mkvmuxerutil.cc \
-		libwebm/mkvmuxer/mkvwriter.cc \
-		-I libwebm/ \
+opus_gapless: opus_gapless.cpp ogg_opus_muxer.*
+	c++ -o opus_gapless -g -O0 -std=c++14 -Wall \
+		opus_gapless.cpp \
+		ogg_opus_muxer.cpp \
 		`pkg-config --libs --cflags opus`
 
 clean:

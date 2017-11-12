@@ -1,0 +1,61 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Ogg Gapless Streaming Test</title>
+		<meta charset="utf-8"/>
+	</head>
+	<body>
+		<script type="text/javascript">
+			"use strict";
+
+			var offs = null;
+			var smpls_buf = 0;
+			var last_msg = 0;
+
+			var cur_idx = 0;
+			var audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+				"latencyHint": "playback",
+				"sampleRate": 48000
+			});
+			const rate = audioCtx.sampleRate;
+
+			function check_needs_data() {
+				let playback_pos = audioCtx.currentTime * rate - offs;
+				console.log((audioCtx.currentTime));
+				if ((smpls_buf - playback_pos) < (30.0 * rate)) {
+					get(cur_idx, function (idx, audioData) {
+						cur_idx++;
+						var source = audioCtx.createBufferSource();
+						audioCtx.decodeAudioData(audioData, function(src) {
+							if (offs === null) {
+								offs = ((audioCtx.currentTime + 0.1) * rate) | 0
+							}
+
+							source.buffer = src;
+							source.connect(audioCtx.destination);
+							source.start((offs + smpls_buf) / rate);
+
+							smpls_buf += src.length;
+							check_needs_data();
+						});
+					});
+				} else {
+					window.setTimeout(check_needs_data, 1000);
+				}
+			}
+
+			check_needs_data();
+
+			function get(idx, cb) {
+				var xhr = new XMLHttpRequest;
+				var url = 'blocks/block_' + ('000000000' + String(idx)).substr(-5, 5) + ".ogg";
+				xhr.open('get', url);
+				xhr.responseType = 'arraybuffer';
+				xhr.onload = function (e) {
+					cb(idx, xhr.response);
+				};
+				xhr.send();
+			};
+		</script>
+	</body>
+</html>
