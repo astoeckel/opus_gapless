@@ -1,9 +1,11 @@
 all: opus_gapless
 
-opus_gapless: opus_gapless.cpp ogg_opus_muxer.*
+opus_gapless: opus_gapless.cpp ogg_opus_muxer.* lpc.*
 	c++ -o opus_gapless -g -O0 -std=c++14 -Wall \
 		opus_gapless.cpp \
+		lpc.cpp \
 		ogg_opus_muxer.cpp \
+		-O3 -g \
 		`pkg-config --libs --cflags opus`
 
 clean:

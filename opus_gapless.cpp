@@ -13,24 +13,10 @@
 #include <vector>
 
 #include <opus/opus.h>
+#include "lpc.hpp"
 #include "ogg_opus_muxer.hpp"
 
 using namespace eolian::stream;
-
-struct OpusMkvCodecPrivate {
-	uint8_t head[8] = {0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64};
-	uint8_t version = 1;
-	uint8_t channel_count;
-	uint16_t pre_skip = 0;
-	uint32_t sample_rate;
-	uint16_t gain = 0;
-	uint8_t mapping_family = 0;
-
-	OpusMkvCodecPrivate(uint8_t channel_count, uint32_t sample_rate)
-	    : channel_count(channel_count), sample_rate(sample_rate)
-	{
-	}
-};
 
 struct Sample {
 	int16_t l, r;
@@ -53,6 +39,8 @@ int main()
 	char zeros[BUF_SIZE];
 	std::fill(zeros, zeros + BUF_SIZE, 0);
 
+	LinearPredictiveCoding lpc(256);
+
 	// Read raw audio data from stdin into continous memory, expects audio in
 	// raw dat format, generate e.g. using ffmpeg:
 	// ffmpeg -loglevel error -i <IN FILE> -ac 2 -ar 48000 -f s16le -
@@ -71,7 +59,7 @@ int main()
 		                 zeros + FRAME_SIZE - raw_audio.size() % FRAME_SIZE);
 	}
 
-	// Encode 1s blocks of the audio data into individual lists of Opus frames
+	// Encode blocks of the audio data into individual vectors of Opus frames
 	std::cerr << "Encoding Opus frames..." << std::endl;
 	int err;
 	OpusEncoder *enc = opus_encoder_create(SAMPLE_RATE, CHANNELS,
@@ -91,14 +79,26 @@ int main()
 
 		std::vector<std::vector<char>> block;
 
-		// Reverse the first frame and write it as a lead-in frame
+		// Reverse the first frame, use predictive coding to "predict" a signal
+		// that leads up to the first frame, reverse the generated LPC signal
+		// and write it as lead-in frame.
 		{
+			std::vector<Sample> lead_in(2 * FRAME_SAMPLES);
 			Sample *s = reinterpret_cast<Sample *>(&(*cur));
-			std::vector<Sample> rev(s, s + FRAME_SAMPLES);
-			std::reverse(rev.begin(), rev.end());
-			int16_t *src = reinterpret_cast<int16_t *>(rev.data());
-			int size = opus_encode(enc, src, FRAME_SAMPLES,
-			                       reinterpret_cast<uint8_t *>(buf), BUF_SIZE);
+			std::copy(s, s + FRAME_SAMPLES, lead_in.begin());
+			std::reverse(lead_in.begin(), lead_in.begin() + FRAME_SAMPLES);
+
+			for (size_t c = 0; c < CHANNELS; c++) {
+				int16_t *src = reinterpret_cast<int16_t*>(lead_in.data()) + c;
+				lpc.extract_coefficients(src, FRAME_SAMPLES, CHANNELS);
+				lpc.predict(src, FRAME_SAMPLES, src + CHANNELS * FRAME_SAMPLES, FRAME_SAMPLES, CHANNELS);
+			}
+			std::reverse(lead_in.begin() + FRAME_SAMPLES, lead_in.end());
+
+			int16_t *src = reinterpret_cast<int16_t*>(lead_in.data() + FRAME_SAMPLES);
+			int size =
+			    opus_encode(enc, src, FRAME_SAMPLES,
+			                      reinterpret_cast<uint8_t *>(buf), BUF_SIZE);
 			if (size > 0) {
 				block.emplace_back(buf, buf + size);
 			}
@@ -116,14 +116,23 @@ int main()
 			cur = frame_end;
 		}
 
-		// Reverse the last frame and write it as a lead-out frame
+		// Generate a lead-out frame by creating an LPC prediction of the
+		// final samples
 		{
+			std::vector<Sample> lead_out(2 * FRAME_SAMPLES);
 			Sample *s = reinterpret_cast<Sample *>(&(*cur)) - FRAME_SAMPLES;
-			std::vector<Sample> rev(s, s + FRAME_SAMPLES);
-			std::reverse(rev.begin(), rev.end());
-			int16_t *src = reinterpret_cast<int16_t *>(rev.data());
-			int size = opus_encode(enc, src, FRAME_SAMPLES,
-			                       reinterpret_cast<uint8_t *>(buf), BUF_SIZE);
+			std::copy(s, s + FRAME_SAMPLES, lead_out.begin());
+
+			for (size_t c = 0; c < CHANNELS; c++) {
+				int16_t *src = reinterpret_cast<int16_t*>(lead_out.data()) + c;
+				lpc.extract_coefficients(src, FRAME_SAMPLES, CHANNELS);
+				lpc.predict(src, FRAME_SAMPLES, src + CHANNELS * FRAME_SAMPLES, FRAME_SAMPLES, CHANNELS);
+			}
+
+			int16_t *src = reinterpret_cast<int16_t *>(lead_out.data() + FRAME_SAMPLES);
+			int size =
+			    opus_encode(enc, src, FRAME_SAMPLES,
+			                      reinterpret_cast<uint8_t *>(buf), BUF_SIZE);
 			if (size > 0) {
 				block.emplace_back(buf, buf + size);
 			}
@@ -154,12 +163,12 @@ int main()
 			const bool last = i + 1 == block.size();
 			if (!last) {
 				granule += FRAME_SAMPLES;
-			} else {
+			}
+			else {
 				granule += 312;
 			}
 			const uint8_t *src = reinterpret_cast<const uint8_t *>(&frame[0]);
-			muxer.write_frame(last, granule, src,
-				              frame.size());
+			muxer.write_frame(last, granule, src, frame.size());
 		}
 		idx++;
 	}
