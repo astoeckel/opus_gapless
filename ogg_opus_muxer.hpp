@@ -31,10 +31,11 @@
 #include <cstdint>
 #include <iosfwd>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace eolian {
 namespace stream {
-
 /**
  * The OggOpusMuxer class packs a set of Opus frames into an Ogg stream along
  * with meta information required by the Opus decoder.
@@ -49,18 +50,29 @@ private:
 
 public:
 	/**
+	 * Data structure representing key-value tag pairs that should be written
+	 * to the OGG metadata header.
+	 */
+	using Tags = std::vector<std::tuple<std::string, std::string>>;
+
+	/**
 	 * Starts writing the Ogg bitstream by writing the header information for
 	 * a single contained Opus audio stream with the given data.
 	 *
 	 * @param pre_skip is the number of samples that should be discarded at the
 	 * beginning of the stream.
+	 * @param vendor is the name of the encoding library.
+	 * @param tags is a vector of key-value pairs that should be written to the
+	 * OGG header.
 	 * @param channel_count is the number of channels contained in the Opus
 	 * audio stream.
 	 * @param sample_rate is the sample rate of the Opus audio stream.
 	 * @param gain is a gain factor that should be applied to the audio data.
 	 */
-	OggOpusMuxer(std::ostream &os, uint16_t pre_skip, uint8_t channel_count = 2,
-	         uint32_t sample_rate = 48000);
+	OggOpusMuxer(std::ostream &os, uint16_t pre_skip,
+	             const std::string &vendor = std::string(),
+	             const Tags &tags = Tags(), uint8_t channel_count = 2,
+	             uint32_t sample_rate = 48000);
 
 	/**
 	 * Writes an Opus frame into the Ogg bitstream.

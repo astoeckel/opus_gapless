@@ -147,8 +147,6 @@ private:
 
 	struct CommentHeader {
 		uint8_t head[8] = {0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73};
-		uint32_t vendor_string_length = 0;
-		uint32_t user_comment_list_length = 0;
 	};
 #pragma pack(pop)
 
@@ -173,15 +171,69 @@ private:
 		flush_page();
 	}
 
-	void write_comment_header()
+	void write_comment_header(const std::string &vendor,
+	                          const OggOpusMuxer::Tags &tags)
 	{
-		// Fill the CommentHeader. For now, we don't write any comment
-		// information
-		CommentHeader head;
+		// Temporary buffer
+		std::vector<uint8_t> buf;
+		buf.reserve(128);
 
-		// Write the entire header as a single information
-		write_packet(false, false, 0, reinterpret_cast<uint8_t *>(&head),
-		             sizeof(head));
+		// Helper function which writes a uint32_t to the header buffer
+		auto write_len = [&](uint32_t len) -> void {
+			const uint8_t *src = reinterpret_cast<const uint8_t *>(&len);
+			buf.insert(buf.end(), src, src + 4);
+		};
+
+		// Helper function which writes a string including its length to the
+		// header buffer
+		auto write_string = [&](const std::string &str) -> void {
+			write_len(str.size());
+			const uint8_t *src = reinterpret_cast<const uint8_t *>(str.c_str());
+			buf.insert(buf.end(), src, src + str.size());
+		};
+
+		// Helper function which writes a key-value pair to the header buffer
+		auto write_tag =
+		    [&](const std::tuple<std::string, std::string> &tag) -> void {
+			uint8_t const *src;
+
+			const std::string &s1 = std::get<0>(tag);
+			const std::string &s2 = std::get<1>(tag);
+			write_len(s1.size() + s2.size() + 1);
+
+			// Write the key string in uppercase
+			src = reinterpret_cast<const uint8_t *>(s1.c_str());
+			buf.insert(buf.end(), src, src + s1.size());
+			uint8_t *c = buf.data() + buf.size() - 1;
+			for (size_t i = 0; i < s1.size(); i++, c--) {
+				if (*c >= 'a' && *c <= 'z') {
+					*c &= ~0x20;
+				}
+			}
+
+			// Write an equals sign
+			buf.push_back('=');
+
+			// Write the value string
+			src = reinterpret_cast<const uint8_t *>(s2.c_str());
+			buf.insert(buf.end(), src, src + s2.size());
+		};
+
+		// Write the comment header
+		CommentHeader head;
+		buf.insert(buf.end(), &head.head[0], &head.head[8]);
+
+		// Write the vendor string
+		write_string(vendor);
+
+		// Write the individual tags
+		write_len(tags.size());
+		for (const auto &tag : tags) {
+			write_tag(tag);
+		}
+
+		// Write the entire header as a single packet
+		write_packet(false, false, 0, buf.data(), buf.size());
 		flush_page();
 	}
 
@@ -220,13 +272,14 @@ private:
 	}
 
 public:
-	Impl(std::ostream &os, uint16_t pre_skip, uint8_t channel_count,
+	Impl(std::ostream &os, uint16_t pre_skip, const std::string &vendor,
+	     const OggOpusMuxer::Tags &tags, uint8_t channel_count,
 	     uint32_t sample_rate)
 	    : m_os(os)
 	{
 		// Write the mandatory headers
 		write_id_header(pre_skip, channel_count, sample_rate);
-		write_comment_header();
+		write_comment_header(vendor, tags);
 	}
 
 	~Impl()
@@ -289,12 +342,15 @@ public:
 };
 
 /******************************************************************************
- * Class OggMuxer                                                             *
+ * Class OggOpusMuxer                                                         *
  ******************************************************************************/
 
 OggOpusMuxer::OggOpusMuxer(std::ostream &os, uint16_t pre_skip,
+                           const std::string &vendor,
+                           const OggOpusMuxer::Tags &tags,
                            uint8_t channel_count, uint32_t sample_rate)
-    : m_impl(std::make_unique<Impl>(os, pre_skip, channel_count, sample_rate))
+    : m_impl(std::make_unique<Impl>(os, pre_skip, vendor, tags, channel_count,
+                                    sample_rate))
 {
 }
 

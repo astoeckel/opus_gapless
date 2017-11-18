@@ -107,7 +107,7 @@ int main()
 		// Opus pre-skip into account.
 		std::ofstream os(ss.str());
 		size_t pre_skip = (idx == 0) ? 312 : 960;
-		OggOpusMuxer muxer(os, pre_skip, CHANNELS, 48000);
+		OggOpusMuxer muxer(os, pre_skip, opus_get_version_string());
 		for (size_t i = 0; i < block.size(); i++) {
 			if (i == 0 && idx > 0) {
 				const auto &frame = blocks[idx - 1].back();
