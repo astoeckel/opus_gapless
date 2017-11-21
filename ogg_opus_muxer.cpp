@@ -129,7 +129,7 @@ private:
 		uint8_t stream_structure_version = 0;
 		uint8_t header_type = 0;
 		int64_t granule = static_cast<uint64_t>(-1LL);
-		uint32_t stream_serial_number = 0;
+		uint32_t stream_serial_number = 1;
 		uint32_t sequence_number = 0;
 		uint32_t checksum = 0;
 		uint8_t page_segments = 0;
