@@ -16,7 +16,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -71,16 +70,14 @@ struct Scale {
  *********************************************************************/
 
 template <typename T>
-static void lpc_coefficients_from_data(std::vector<double> &lpc, const T *src,
-                                       size_t n_src, size_t stride)
+static void lpc_coefficients_from_data(float *lpcf, const T *src, size_t n_src,
+                                       size_t stride)
 {
-	const size_t order = lpc.size();
-	std::vector<double> aut(order + 1);
+	constexpr size_t order = LinearPredictiveCoder::order();
+	alignas(16) double lpc[order];
+	alignas(16) double aut[order + 1];
 	double error;
 	double epsilon;
-
-	// Reset the lpc coefficients
-	std::fill(lpc.begin(), lpc.end(), 0.0);
 
 	// FIXME: Apply a window to the input.
 	// autocorrelation, p+1 lag coefficients
@@ -115,7 +112,9 @@ static void lpc_coefficients_from_data(std::vector<double> &lpc, const T *src,
 		double r = -aut[i + 1];
 
 		if (error < epsilon) {
-			std::fill_n(lpc.begin() + i, order - i, 0.0);
+			for (size_t j = i; j < order; j++) {
+				lpc[j] = 0.0;
+			}
 			goto done;
 		}
 
@@ -151,20 +150,35 @@ done:
 		double g = .999;
 		double damp = g;
 		for (size_t j = 0; j < order; j++) {
-			lpc[j] *= damp;
+			lpcf[j] = lpc[j] * damp;
 			damp *= g;
 		}
 	}
 }
 
 /******************************************************************************
- * Implementation of LinearPredictiveCoding::predict                          *
+ * Class LinearPredictiveCoder                                                *
  ******************************************************************************/
 
+void LinearPredictiveCoder::extract_coefficients(const float *samples,
+                                                 size_t n_samples,
+                                                 size_t stride)
+{
+	lpc_coefficients_from_data(m_coeffs, samples, n_samples, stride);
+}
+
+void LinearPredictiveCoder::extract_coefficients(const int16_t *samples,
+                                                 size_t n_samples,
+                                                 size_t stride)
+{
+	lpc_coefficients_from_data(m_coeffs, samples, n_samples, stride);
+}
+
 template <typename T>
-void predict_impl(const std::vector<double> &lpc, const T *src_samples,
-                  size_t n_src_samples, T *tar_samples, size_t n_tar_samples,
-                  size_t stride)
+void LinearPredictiveCoder::predict_impl(const T *src_samples,
+                                         size_t n_src_samples, T *tar_samples,
+                                         size_t n_tar_samples,
+                                         size_t stride) const
 {
 	// Fill the target memory with zeros
 	for (size_t i = 0; i < n_tar_samples; i++) {
@@ -191,52 +205,27 @@ void predict_impl(const std::vector<double> &lpc, const T *src_samples,
 	// samples
 	for (size_t i = 0; i < n_tar_samples; i++) {
 		double sum = 0.0;
-		for (size_t j = 0; j < lpc.size(); j++) {
-			sum -= read(i, j) * lpc[j];
+		for (size_t j = 0; j < order(); j++) {
+			sum -= read(i, j) * m_coeffs[j];
 		}
 		tar_samples[i * stride] = sum * Scale<T>::s;
 	}
 }
 
-/******************************************************************************
- * Class LinearPredictiveCoding *
- ******************************************************************************/
-
-LinearPredictiveCoding::LinearPredictiveCoding(size_t order)
-    : m_order(order), m_coeffs(order, 0.0)
+void LinearPredictiveCoder::predict(const float *src_samples,
+                                    size_t n_src_samples, float *tar_samples,
+                                    size_t n_tar_samples, size_t stride) const
 {
+	predict_impl(src_samples, n_src_samples, tar_samples, n_tar_samples,
+	             stride);
 }
 
-void LinearPredictiveCoding::extract_coefficients_float(const float *samples,
-                                                        size_t n_samples,
-                                                        size_t stride)
+void LinearPredictiveCoder::predict(const int16_t *src_samples,
+                                    size_t n_src_samples, int16_t *tar_samples,
+                                    size_t n_tar_samples, size_t stride) const
 {
-	lpc_coefficients_from_data(m_coeffs, samples, n_samples, stride);
-}
-
-void LinearPredictiveCoding::extract_coefficients(const int16_t *samples,
-                                                  size_t n_samples,
-                                                  size_t stride)
-{
-	lpc_coefficients_from_data(m_coeffs, samples, n_samples, stride);
-}
-
-void LinearPredictiveCoding::predict_float(const float *src_samples,
-                                           size_t n_src_samples,
-                                           float *tar_samples,
-                                           size_t n_tar_samples,
-                                           size_t stride) const
-{
-	predict_impl(m_coeffs, src_samples, n_src_samples, tar_samples,
-	             n_tar_samples, stride);
-}
-
-void LinearPredictiveCoding::predict(const int16_t *src_samples,
-                                     size_t n_src_samples, int16_t *tar_samples,
-                                     size_t n_tar_samples, size_t stride) const
-{
-	predict_impl(m_coeffs, src_samples, n_src_samples, tar_samples,
-	             n_tar_samples, stride);
+	predict_impl(src_samples, n_src_samples, tar_samples, n_tar_samples,
+	             stride);
 }
 }
 }

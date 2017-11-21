@@ -31,41 +31,43 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 namespace eolian {
 namespace stream {
-
 /**
  * The LinearPredictiveCoding class represents the convolution coefficients of a
  * linear predictive coder, as well as functions to extract these coefficients
  * from a chunk of audio data and to predict audio given these coefficients.
  */
-class LinearPredictiveCoding {
+class LinearPredictiveCoder {
 private:
 	/**
-	 * Number of coefficients used in this particular linear predictive coder.
+	 * Number of coefficients to use in the filter.
 	 */
-	size_t m_order;
+	static constexpr size_t LPC_ORDER = 24;
 
 	/**
 	 * Vector used to store the LPC coefficients.
 	 */
-	std::vector<double> m_coeffs;
+	alignas(16) float m_coeffs[LPC_ORDER];
+
+	template <typename T>
+	void predict_impl(const T *src_samples, size_t n_src_samples,
+	                  T *tar_samples, size_t n_tar_samples,
+	                  size_t stride) const;
 
 public:
 	/**
-	 * Creates a new LinearPredictiveCoding instance of the given order.
-	 *
-	 * @param order is the number of coefficients used in the linear predictive
-	 * coder.
+	 * Returns a pointer at the extracted LPC coefficient buffer. The number of
+	 * elements is equal to the order of the predictor.
 	 */
-	LinearPredictiveCoding(size_t order = 24);
+	const float *coeffs() const { return m_coeffs; }
 
 	/**
-	 * Returns the extracted LPC coefficients.
+	 * Returns the order of the LPC, which corresponds to the number of
+	 * coefficients used for the linear predictive coding.
 	 */
-	const std::vector<double> &coeffs() const {return m_coeffs;}
+	static constexpr size_t order() { return LPC_ORDER; }
 
 	/**
 	 * Extracts the LPC coefficients from a chunk of audio data represented as
@@ -77,8 +79,8 @@ public:
 	 * @param stride is the number of interleaved samples. Usually this is the
 	 * number of audio channels in a certain signal.
 	 */
-	void extract_coefficients_float(const float *samples, size_t n_samples,
-	                                size_t stride = 1);
+	void extract_coefficients(const float *samples, size_t n_samples,
+	                          size_t stride = 1);
 
 	/**
 	 * Extracts the LPC coefficients from a chunk of audio data represented as
@@ -105,9 +107,9 @@ public:
 	 * output buffer. Usually this is the number of audio channels in a certain
 	 * signal.
 	 */
-	void predict_float(const float *src_samples, size_t n_src_samples,
-	                   float *tar_samples, size_t n_tar_samples,
-	                   size_t stride = 1) const;
+	void predict(const float *src_samples, size_t n_src_samples,
+	             float *tar_samples, size_t n_tar_samples,
+	             size_t stride = 1) const;
 
 	/**
 	 * Predicts an audio signal from the given integer point source signal
@@ -122,7 +124,8 @@ public:
 	 * signal.
 	 */
 	void predict(const int16_t *src_samples, size_t n_src_samples,
-	             int16_t *tar_samples, size_t n_tar_samples, size_t stride = 1) const;
+	             int16_t *tar_samples, size_t n_tar_samples,
+	             size_t stride = 1) const;
 };
 }
 }
