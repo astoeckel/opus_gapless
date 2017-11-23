@@ -5,8 +5,8 @@ This program demos streaming independent chunks of Ogg/Opus audio and playing th
 https://somweyr.de/opus/demo.html
 
 Gapless playback is achieved by two independent measures:
-* **Lead-in and lead-out frames** The encoder adds an additional frame to the beginning/end of each chunk. This frame contains artificial audio data predicted using Linear Predictive Coding. This suppresses ringing-artifacts caused by the encoder trying to encode the discontinuities at the beginning/end of a chunk.
-* **Overlap** All chunks slightly overlap each other and are cross-faded by the browser. The exact number of audio samples that should be cross-faded is stored in the proprietary `CF_IN`, `CF_OUT` metadata fields. These metadata fields are parsed on the JavaScript client. The demo uses extreme overlap values (250ms) for visualization purposes, but 1ms will work just as well.
+* **Lead-in and lead-out frames:** The encoder adds an additional frame to the beginning/end of each chunk. This frame contains artificial audio data predicted using Linear Predictive Coding. This suppresses ringing-artifacts caused by the encoder trying to encode the discontinuities at the beginning/end of a chunk.
+* **Overlap:** All chunks slightly overlap each other and are cross-faded by the browser. The exact number of audio samples that should be cross-faded is stored in the proprietary `CF_IN`, `CF_OUT` metadata fields. These metadata fields are parsed on the JavaScript client. The demo uses extreme overlap values (250ms) for visualization purposes, but 1ms will work just as well.
 
 This code is part of a larger project I'm currently working on and will not receive any further updates in this repository (unless I find severe bugs).
 
