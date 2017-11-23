@@ -1,6 +1,8 @@
 # Gapless stream from pre-encoded Opus frames
 
-This program demos streaming independent chunks of Ogg/Opus audio and playing them back in the browser. An online demo can be found at
+This repository contains a C++ program which generates independently encoded Ogg/Opus audio segments. These audio segments can be seamlessly played back in a webbrowser using WebAudio. *Indepdentently encoded* means that the individual segments could have been encoded in parallel or in a random order. Since each segment can be deterministically generated, segments can be seved using a RESTful API or stored in Content-Addressed filesystems such as IPFS.
+
+An online demo can be found at
 
 https://somweyr.de/opus/demo.html
 
