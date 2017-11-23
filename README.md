@@ -7,8 +7,8 @@ An online demo can be found at
 https://somweyr.de/opus/demo.html
 
 Gapless playback is achieved by two independent measures:
-* **Lead-in and lead-out frames:** The encoder adds an additional frame to the beginning/end of each chunk. This frame contains artificial audio generated with Linear Predictive Coding. This artificial audio naturally extends the data at the beginning/end of each segments. This suppresses ringing-artifacts caused by encoding the discontinuities at the beginning/end of a chunk. The extra data is thrown away after decoding using the `pre_skip` and `granule` stored in the Ogg/Opus container.
-* **Overlap:** All chunks slightly overlap each other and are cross-faded by the browser. The number of audio samples to be cross-faded is stored in the proprietary `CF_IN`, `CF_OUT` metadata fields of each segment. These metadata fields are parsed on the JavaScript client. The demo uses extreme overlap values (250ms) and very short segments (1s) for visualization purposes, but 1ms overlap will work just as well.
+* **Lead-in and lead-out frames:** The encoder adds an additional frame to the beginning/end of each chunk. This frame contains artificial audio generated with Linear Predictive Coding. This artificial audio naturally extends the data at the beginning/end of each segment. The extra data is thrown away after decoding using the `pre_skip` and `granule` stored in the Ogg/Opus container. This suppresses ringing-artifacts caused by encoding the discontinuities at the beginning/end of a chunk.
+* **Overlap:** All chunks slightly overlap each other and are cross-faded by the browser. The number of audio samples to be cross-faded is stored in each segment as proprietary `CF_IN`, `CF_OUT` metadata fields, which are then parsed by the JavaScript client. The demo uses extreme overlap values (250ms) and very short segments (1s) for demo purposes, but 1ms overlap will work just as well.
 
 This code is part of a larger project I'm currently working on and will not receive any further updates in this repository (unless I find severe bugs).
 
