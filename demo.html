@@ -3,8 +3,84 @@
 	<head>
 		<title>Ogg Gapless Streaming Test</title>
 		<meta charset="utf-8"/>
+		<style type="text/css">
+			body {
+				font-family: sans;
+				font-size: 12pt;
+				margin: 1rem;
+			}
+			#vis {
+				margin: 1rem;
+				position: relative;
+				overflow: auto; 
+				white-space: nowrap;
+				height: 4rem;
+			}
+			#vis .cursor {
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				width: 0;
+				border: 1px dashed black;
+				opacity: 0.75;
+				z-index: 1;
+			}
+			#vis .chunk {
+				position: absolute;
+				top: 0;
+				left: 0;
+				height: 1.5rem;
+				z-index: 0;
+			}
+			#vis .chunk:nth-child(2n+1) {
+				top: 1.5rem;
+			}
+			#vis .chunk span {
+				display: inline-block;
+				height: 1.5rem;
+				background-color: #f0f0f0;
+			}
+
+			#vis .chunk span.space {
+				visibility: hidden;
+			}
+
+			#vis .chunk span.lead_in, #vis .chunk span.lead_out {
+				background: repeating-linear-gradient(
+					45deg,
+					#606dbc,
+					#606dbc 2px,
+					#465298 2px,
+					#465298 4px
+				);
+			}
+
+			#vis .chunk span.main {
+				background-color: rgb(192, 192, 192);
+			}
+
+			button {
+				font-size:14pt;
+				padding: 1.5rem;
+				margin: 1rem 0;
+			}
+		</style>
 	</head>
 	<body>
+		<h1>Demo: Gapless playback of independently encoded Ogg/Opus chunks using WebAudio</h1>
+		<!--<div><em>Music:</em>
+			<dl>
+				<dt>Title:</dt><dd>Maker of Worlds</dd>
+				<dt>Artist:</dt><dd>Daniel Ran</dd>
+				<dt>Album:</dt><dd>Beyond Skyrim: Bruma OST</dd>
+				<dt>Artist:</dt><dd>Daniel Ran</dd>
+				<dt>Licence:</dt><dd>CC BY-SA 4.0</dd>
+			</dl>
+		</div>-->
+		<div>C++ source code: <a href="https://github.com/astoeckel/opus_gapless/">https://github.com/astoeckel/opus_gapless/</a></div>
+		<button id="play">⏵ Play!</button>
+		<div id="vis"><span class="cursor"></span></div>
+
 		<script type="text/javascript">
 			"use strict";
 
@@ -19,11 +95,90 @@
 			});
 			const rate = audioCtx.sampleRate;
 
+			const OPUS_TAGS_MAGIC = new Uint8Array([0x4F, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73]);
+			
+			function read_opus_tags(data) {
+				function read_int() {
+					if (u8.length < ptr + 4) {
+						throw "Unexpected end of stream";
+					}
+		
+					let res = 0;
+					for (let i = 0; i < 4; i++) {
+						res |= u8[ptr + i] << (8 * i);
+					}
+					ptr += 4;
+					return res;
+				}
+		
+				function read_string(len) {
+					if (u8.length < ptr + len) {
+						throw "Unexpected end of stream";
+					}
+					let es = String.fromCharCode.apply(null, u8.slice(ptr, ptr + len));
+					ptr += len;
+					return decodeURIComponent(escape(es));
+				}
+		
+				// Find the "OpusTags" magic signature
+				const u8 =  new Uint8Array(data, 0, Math.min(65025, data.byteLength));
+				let ptr = 0, i = 0;
+				while (ptr < u8.length) {
+					if (u8[ptr++] === OPUS_TAGS_MAGIC[i]) {
+						if (++i == 8) {
+							break;
+						}
+					} else {
+						i = 0;
+					}
+				}
+		
+				let res = {}
+				try {
+					// Read (and discard) the vendor string
+					read_string(read_int());
+		
+					// Read the actual tags
+					const n_tags = read_int();
+					for (let i = 0; i < n_tags; i++) {
+						let [key, value] = read_string(read_int()).split("=");
+						res[key] = value
+					}
+				} finally {
+					return res;
+				}
+			}
+
+			function wnd(i, n) {
+				return (i + 1.0) / (n + 1.0);
+			}
+
+			function add_vis(offs, len, cf_in, cf_out) {
+				function mkspan(cls, w) {
+					let span = document.createElement("span");
+					span.classList.add(cls);
+					span.style.width = (w / 48000 * scale) + "px";
+					return span;
+				}
+
+				const scale = 10.0;
+				let cnt = document.createElement("div");
+				cnt.classList.add("chunk");
+				cnt.appendChild(mkspan("space", offs));
+				cnt.appendChild(mkspan("lead_in", cf_in));
+				cnt.appendChild(mkspan("main", len - (cf_in + cf_out)));
+				cnt.appendChild(mkspan("lead_out", cf_out));
+
+				document.getElementById("vis").appendChild(cnt);
+			}
+
 			function check_needs_data() {
 				let playback_pos = audioCtx.currentTime * rate - offs;
-				console.log((audioCtx.currentTime));
 				if ((smpls_buf - playback_pos) < (30.0 * rate)) {
 					get(cur_idx, function (idx, audioData) {
+						let tags = read_opus_tags(audioData);
+						let cf_in = parseInt(tags["CF_IN"]);
+						let cf_out = parseInt(tags["CF_OUT"]);
 						cur_idx++;
 						var source = audioCtx.createBufferSource();
 						audioCtx.decodeAudioData(audioData, function(src) {
@@ -31,11 +186,26 @@
 								offs = ((audioCtx.currentTime + 0.1) * rate) | 0
 							}
 
+							const cf_in_t =(cf_in * audioCtx.sampleRate / 48000) | 0;
+							const cf_out_t = (cf_out * audioCtx.sampleRate / 48000) | 0;
+							for (let chan = 0; chan < src.numberOfChannels; chan++) {
+								let data = src.getChannelData(chan);
+								for (let i = 0; i < cf_in_t; i++) {
+									data[i] *= wnd(i, cf_in_t);
+								}
+
+								for (let i = 0; i < cf_out_t; i++) {
+									data[data.length - cf_out_t + i] *= (1.0 - wnd(i, cf_out_t));
+								}
+							}
+
 							source.buffer = src;
 							source.connect(audioCtx.destination);
 							source.start((offs + smpls_buf) / rate);
 
-							smpls_buf += src.length;
+							add_vis(smpls_buf, src.length, cf_in_t, cf_out_t);
+
+							smpls_buf += src.length - cf_out_t;
 							check_needs_data();
 						});
 					});
@@ -44,7 +214,18 @@
 				}
 			}
 
-			check_needs_data();
+			window.setInterval(function() {
+				if (offs !== null) {
+					document.querySelector(".cursor").style.left = (((audioCtx.currentTime - offs / rate) * 10.0) | 0) + "px";
+				}
+			}, 100);
+
+			document.getElementById("play").addEventListener("click", function() {
+				if (smpls_buf == 0) {
+					check_needs_data();
+				}
+				this.setAttribute("disabled", "disabled");
+			});
 
 			function get(idx, cb) {
 				var xhr = new XMLHttpRequest;

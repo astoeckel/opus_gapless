@@ -60,7 +60,8 @@ public:
 	 * a single contained Opus audio stream with the given data.
 	 *
 	 * @param pre_skip is the number of samples that should be discarded at the
-	 * beginning of the stream.
+	 * beginning of the stream. Note that the pre_skip is always expressed in
+	 * a 48000 samples/s time basis.
 	 * @param vendor is the name of the encoding library.
 	 * @param tags is a vector of key-value pairs that should be written to the
 	 * OGG header.
@@ -79,7 +80,8 @@ public:
 	 *
 	 * @param last set to true if this is the last frame being written.
 	 * @param granule number of samples in the stream after the end of this
-	 * frame.
+	 * frame. Note that the granule is always expressed in a 48000 samples/s
+	 * time basis.
 	 * @param buf is a pointer at the byte-buffer containing the Opus frame that
 	 * should be written into the Ogg bitstream.
 	 * @param len is the length of the byte buffer that should be written.
