@@ -25,7 +25,7 @@ make
 
 ## Running
 
-To run feed raw stereo floating point audio data at 48000 samples/s into the `opus_gapless` program. This will create a number of files in the `blocks` subdirectory.
+Feed raw stereo floating point audio data at 48000 samples/s into the `opus_gapless` program. This will create a number of files in the `blocks` subdirectory.
 ```sh
 mkdir -p blocks && rm -f blocks/* && ffmpeg -loglevel error -i <AUDIO FILE> -ac 2 -ar 48000 -f f32le - | ./opus_gapless
 ```
