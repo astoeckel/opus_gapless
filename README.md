@@ -1,6 +1,6 @@
 # Gapless stream from pre-encoded Opus frames
 
-This repository contains a C++ program which generates independently encoded Ogg/Opus audio segments. These audio segments can be seamlessly played back in a webbrowser using WebAudio. *Indepdentently encoded* means that the individual segments could have been encoded in parallel or in a random order. Since each segment can be deterministically generated, segments can be seved using a RESTful API or stored in Content-Addressed filesystems such as IPFS.
+This repository contains a C++ program which generates independently encoded Ogg/Opus audio segments. These audio segments can be seamlessly played back in a webbrowser using WebAudio. *Indepdentently encoded* means that the individual segments could have been encoded in parallel or in a random order. Segments are deterministically generated, and thus can be served using a RESTful APIs, or stored in content-addressed filesystems such as IPFS.
 
 An online demo can be found at
 
@@ -8,7 +8,7 @@ https://somweyr.de/opus/demo.html
 
 Gapless playback is achieved by two independent measures:
 * **Lead-in and lead-out frames:** The encoder adds an additional frame to the beginning/end of each chunk. This frame contains artificial audio data predicted using Linear Predictive Coding. This suppresses ringing-artifacts caused by the encoder trying to encode the discontinuities at the beginning/end of a chunk.
-* **Overlap:** All chunks slightly overlap each other and are cross-faded by the browser. The exact number of audio samples that should be cross-faded is stored in the proprietary `CF_IN`, `CF_OUT` metadata fields. These metadata fields are parsed on the JavaScript client. The demo uses extreme overlap values (250ms) for visualization purposes, but 1ms will work just as well.
+* **Overlap:** All chunks slightly overlap each other and are cross-faded by the browser. The exact number of audio samples that should be cross-faded is stored in the proprietary `CF_IN`, `CF_OUT` metadata fields. These metadata fields are parsed on the JavaScript client. The demo uses extreme overlap values (250ms) and very short segments (1s) for visualization purposes, but 1ms overlap will work just as well.
 
 This code is part of a larger project I'm currently working on and will not receive any further updates in this repository (unless I find severe bugs).
 
